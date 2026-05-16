@@ -291,6 +291,234 @@
     </div>
   </section>
 
+  <!-- ─── FDA CHATBOT ─── -->
+  <section class="max-w-2xl mx-auto px-6 py-12">
+    <h2 class="text-xl font-bold mb-2">Ask the FDA Adverse Events Data</h2>
+    <p class="text-accent text-sm mb-5 leading-relaxed">
+      Powered by the <a href="https://github.com/leonardoalva98/healthcare-adverse-events-pipeline"
+        class="underline hover:text-black">Healthcare Adverse Events Pipeline</a> — ask anything about drug safety
+      reports stored in Snowflake. The AI writes the SQL, queries the database live, and explains the results in plain
+      English.
+    </p>
+
+    <!-- Suggestion chips -->
+    <div class="flex flex-wrap gap-2 mb-4">
+      <button class="suggestion-chip" onclick="fdaChat.send('Which drugs have the most death reports?')">Which drugs
+        have the most death reports?</button>
+      <button class="suggestion-chip" onclick="fdaChat.send('What are the most common reactions to Fentanyl?')">Most
+        common Fentanyl reactions?</button>
+      <button class="suggestion-chip"
+        onclick="fdaChat.send('How many serious adverse events occurred in the US?')">Serious events in the US?</button>
+    </div>
+
+    <!-- Messages -->
+    <div id="fda-messages"
+      class="border border-gray-200 rounded-xl bg-gray-50 p-4 h-72 overflow-y-auto flex flex-col gap-3 mb-3">
+      <div class="bot-msg">
+        <span>Hi! I can answer questions about FDA drug adverse event data. Try one of the suggestions above or type
+          your own question.</span>
+      </div>
+    </div>
+
+    <!-- Input row -->
+    <form id="fda-form" class="flex gap-2">
+      <input id="fda-input" type="text" placeholder="Ask about drugs, reactions, or adverse events…"
+        class="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#0a82af]"
+        autocomplete="off" />
+      <button type="submit"
+        class="bg-[#0a82af] hover:bg-[#087095] text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors">
+        Ask
+      </button>
+    </form>
+  </section>
+
+  <style>
+    .suggestion-chip {
+      font-size: 12px;
+      color: #0a82af;
+      font-weight: 600;
+      border: 1px solid #b6e8f7;
+      border-radius: 9999px;
+      padding: 4px 14px;
+      background: #e5f8ff;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .suggestion-chip:hover {
+      background: #c8f0ff;
+    }
+
+    .bot-msg {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .bot-msg span {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 0 12px 12px 12px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #3e5059;
+      line-height: 1.55;
+      max-width: 90%;
+    }
+
+    .user-msg {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .user-msg span {
+      background: #0a82af;
+      color: white;
+      border-radius: 12px 12px 0 12px;
+      padding: 10px 14px;
+      font-size: 13px;
+      max-width: 80%;
+      line-height: 1.5;
+    }
+
+    .sql-block {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    .sql-toggle {
+      cursor: pointer;
+      color: #0a82af;
+      font-size: 11px;
+      text-decoration: underline;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+
+    .sql-code {
+      display: none;
+      margin-top: 4px;
+      background: #f3f4f6;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .typing-dots span {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin: 0 2px;
+      background: #9ca3af;
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+
+    .typing-dots span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-dots span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes bounce {
+
+      0%,
+      80%,
+      100% {
+        transform: translateY(0);
+      }
+
+      40% {
+        transform: translateY(-5px);
+      }
+    }
+  </style>
+
+  <script>
+    const API_URL = 'https://fda-chatbot-api.onrender.com';
+
+    const fdaChat = {
+      messages: document.getElementById('fda-messages'),
+      input: document.getElementById('fda-input'),
+
+      addUser(text) {
+        const div = document.createElement('div');
+        div.className = 'user-msg';
+        div.innerHTML = `<span>${this.escape(text)}</span>`;
+        this.messages.appendChild(div);
+        this.scroll();
+        return div;
+      },
+
+      addBot(text, sql) {
+        const div = document.createElement('div');
+        div.className = 'bot-msg';
+        const sqlId = 'sql-' + Date.now();
+        div.innerHTML = `<span>${this.escape(text)}${sql ? `
+          <div class="sql-block">
+            <button class="sql-toggle" onclick="document.getElementById('${sqlId}').style.display=document.getElementById('${sqlId}').style.display==='block'?'none':'block'">View SQL</button>
+            <pre id="${sqlId}" class="sql-code">${this.escape(sql)}</pre>
+          </div>` : ''}</span>`;
+        this.messages.appendChild(div);
+        this.scroll();
+        return div;
+      },
+
+      addTyping() {
+        const div = document.createElement('div');
+        div.className = 'bot-msg';
+        div.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span>`;
+        this.messages.appendChild(div);
+        this.scroll();
+        return div;
+      },
+
+      scroll() {
+        this.messages.scrollTop = this.messages.scrollHeight;
+      },
+
+      escape(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      },
+
+      async send(question) {
+        question = question.trim();
+        if (!question) return;
+        this.input.value = '';
+        this.addUser(question);
+        const typing = this.addTyping();
+        try {
+          const res = await fetch(`${API_URL}/ask`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question }),
+          });
+          const data = await res.json();
+          typing.remove();
+          if (!res.ok) {
+            this.addBot(data.detail || 'Something went wrong. Please try again.');
+          } else {
+            this.addBot(data.answer, data.sql);
+          }
+        } catch {
+          typing.remove();
+          this.addBot('Could not reach the server. The API may be starting up — please try again in a moment.');
+        }
+      }
+    };
+
+    document.getElementById('fda-form').addEventListener('submit', e => {
+      e.preventDefault();
+      fdaChat.send(fdaChat.input.value);
+    });
+  </script>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 
